@@ -20,7 +20,6 @@
             margin: 0 auto;
             background: #fff;
             position: relative;
-            overflow: hidden;
         }
 
         .page {
@@ -29,31 +28,29 @@
             height: 100%;
             position: absolute;
             top: 0; left: 0;
+            z-index: 1;
         }
-        .page.active { display: block; animation: fadeIn 0.5s ease; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .page.active { display: block; z-index: 10; }
 
-        /* รูปภาพอยู่เลเยอร์ล่างสุด */
         .bg-img { 
             width: 100%; 
             height: 100%; 
             object-fit: cover; 
-            position: absolute; 
-            top: 0; 
-            left: 0; 
-            z-index: 1; 
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: -1;
         }
 
-        /* ปุ่มอยู่เลเยอร์ที่สูงกว่ารูปภาพ แต่อยู่ตำแหน่งเดิมด้านล่าง */
         .btn-wrapper {
             position: absolute;
-            bottom: 10%; /* ตำแหน่งด้านล่างเหมือนเดิม */
+            bottom: 10%;
             left: 0;
             width: 100%;
             display: flex;
             justify-content: center;
             padding: 0 20px;
-            z-index: 99; /* เลเยอร์สูงกว่ารูป */
+            z-index: 999; /* มั่นใจว่าปุ่มอยู่บนสุดของรูปภาพ */
         }
         
         .btn-main {
@@ -67,8 +64,10 @@
             font-weight: 700;
             box-shadow: 0 8px 20px rgba(0,0,0,0.5);
             cursor: pointer;
+            display: block;
+            text-align: center;
         }
-        .btn-main:active { transform: scale(0.95); }
+        .btn-main:active { transform: scale(0.95); background: #fcf6ba; }
 
         .blessing-overlay {
             position: absolute;
@@ -81,11 +80,8 @@
             border: 4px solid #bf953f;
             text-align: center;
             font-size: 1.2rem;
-            color: #222;
-            display: none;
             z-index: 100;
-            box-shadow: 0 15px 30px rgba(0,0,0,0.5);
-            line-height: 1.6;
+            display: none;
         }
 
         .vdo-container { width: 100%; height: 100%; background: #000; display: flex; align-items: center; }
@@ -100,7 +96,7 @@
             padding: 6px 15px;
             border-radius: 20px;
             font-size: 14px;
-            z-index: 10;
+            z-index: 50;
         }
     </style>
 </head>
@@ -121,3 +117,109 @@
             <button class="btn-main" onclick="startCeremony()" style="background: var(--blue-deep); color: white; border-color: #fff;">
                 ไปรดน้ำท่านแรก >
             </button>
+        </div>
+    </div>
+
+    <div id="page3" class="page">
+        <div id="blessText" class="blessing-overlay"></div>
+        <div class="step-counter" id="stepLabel">ท่านที่ 1/5</div>
+        
+        <div id="stillPhase" style="height: 100%;">
+            <img id="bossPic" src="" class="bg-img">
+            <div class="btn-wrapper">
+                <button class="btn-main" onclick="runWaterVdo()">💧 กดรดน้ำดำหัวออนไลน์</button>
+            </div>
+        </div>
+
+        <div id="vdoPhase" class="vdo-container" style="display:none;">
+            <video id="vdoPlayer" playsinline>
+                <source id="vdoSrc" src="" type="video/mp4">
+            </video>
+            <div id="nextArea" class="btn-wrapper" style="display:none;">
+                <button id="nextBtn" class="btn-main" onclick="nextStep()">ไปรดน้ำท่านถัดไป ></button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    const testVideo = "https://res.cloudinary.com/dl5s23mrx/video/upload/v1775617600/797286068.020355_wfg4qw.mp4";
+
+    const data = [
+        { img: 'https://i.ibb.co/1k0JHFQ/3.png', vdo: testVideo },
+        { img: 'https://i.ibb.co/1thy4WZn/4.png', vdo: testVideo },
+        { img: 'https://i.ibb.co/Y4vvjsVw/5.png', vdo: testVideo },
+        { img: 'https://i.ibb.co/fdrM5Pmp/4.png', vdo: testVideo },
+        { img: 'https://i.ibb.co/GLt8rYX/7.png', vdo: testVideo }
+    ];
+
+    const wishes = [
+        "ขอให้ปีใหม่ไทยนี้ นำพาความสุข พลังกายและพลังใจที่ดีมาสู่พวกเราทุกคนครับ",
+        "ขออำนาจคุณพระศรีรัตนตรัย ประทานพรให้ท่านและครอบครัวมีความสุขครับ",
+        "ขอให้ท่านมีสุขภาพแข็งแรง เป็นกำลังสำคัญในการพัฒนาการศึกษาไทยครับ",
+        "ขอให้เย็นฉ่ำชื่นใจเหมือนสายน้ำสงกรานต์ สมความปรารถนาทุกประการครับ",
+        "ขอขอบคุณในความทุ่มเท ขอให้สงกรานต์นี้เป็นปีที่ดีของท่านครับ"
+    ];
+
+    let currentIdx = 0;
+
+    function goToPage(n) {
+        // ลบ active จากทุกหน้า
+        const allPages = document.querySelectorAll('.page');
+        allPages.forEach(p => p.classList.remove('active'));
+        
+        // เพิ่ม active ให้หน้าที่ระบุ
+        const target = document.getElementById('page' + n);
+        if(target) {
+            target.classList.add('active');
+        }
+    }
+
+    function startCeremony() {
+        currentIdx = 0;
+        setupBoss();
+        goToPage(3);
+    }
+
+    function setupBoss() {
+        const item = data[currentIdx];
+        document.getElementById('bossPic').src = item.img;
+        document.getElementById('vdoSrc').src = item.vdo;
+        document.getElementById('vdoPlayer').load();
+        document.getElementById('stepLabel').innerText = `ท่านที่ ${currentIdx + 1}/5`;
+        
+        document.getElementById('stillPhase').style.display = 'block';
+        document.getElementById('vdoPhase').style.display = 'none';
+        document.getElementById('blessText').style.display = 'none';
+        document.getElementById('nextArea').style.display = 'none';
+    }
+
+    function runWaterVdo() {
+        document.getElementById('stillPhase').style.display = 'none';
+        document.getElementById('vdoPhase').style.display = 'flex';
+        const v = document.getElementById('vdoPlayer');
+        v.play();
+
+        v.onended = function() {
+            const msg = wishes[Math.floor(Math.random() * wishes.length)];
+            const box = document.getElementById('blessText');
+            box.innerText = msg;
+            box.style.display = 'block';
+            document.getElementById('nextArea').style.display = 'flex';
+            document.getElementById('nextBtn').innerText = (currentIdx === data.length - 1) ? "จบพิธี (กลับหน้าแรก)" : "ไปรดน้ำท่านถัดไป >";
+        };
+    }
+
+    function nextStep() {
+        if (currentIdx < data.length - 1) {
+            currentIdx++;
+            setupBoss();
+        } else {
+            location.reload(); 
+        }
+    }
+</script>
+
+</body>
+</html>
